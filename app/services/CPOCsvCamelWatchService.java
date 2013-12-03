@@ -1,18 +1,21 @@
 package services;
 
-import akka.actor.ActorRef;
-import com.google.common.base.Throwables;
-import com.google.common.util.concurrent.AbstractService;
-import com.google.inject.Inject;
-import com.google.inject.name.Named;
+import java.util.Map;
+
 import models.csv.CodePointOpenCsvEntry;
+
 import org.apache.camel.CamelContext;
 import org.apache.camel.Exchange;
 import org.apache.camel.Processor;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.model.dataformat.BindyType;
 
-import java.util.Map;
+import akka.actor.ActorRef;
+
+import com.google.common.base.Throwables;
+import com.google.common.util.concurrent.AbstractService;
+import com.google.inject.Inject;
+import com.google.inject.name.Named;
 
 /**
  * Service that watches the 'cpo.watch' directory for CodePoint-Open CSV files using Apache Camel.
@@ -39,10 +42,9 @@ public class CPOCsvCamelWatchService extends AbstractService {
                             @Override
                             public void process(Exchange exchange) throws Exception {
                                 Object body = exchange.getIn().getBody();
-
+                                
                                 if (body instanceof Map) {
                                     Map<String, CodePointOpenCsvEntry> csvEntryMap = (Map<String, CodePointOpenCsvEntry>) body;
-
                                     for (CodePointOpenCsvEntry entry : csvEntryMap.values()) {
                                         actorRef.tell(entry, ActorRef.noSender());
                                     }

@@ -49,7 +49,6 @@ public class ProcessCPOCsvEntry extends UntypedActor {
     public void onReceive(Object message) {
         if (message instanceof CodePointOpenCsvEntry) {
             CodePointOpenCsvEntry entry = (CodePointOpenCsvEntry) message;
-
             PostcodeUnit unit = new PostcodeUnit(CharMatcher.WHITESPACE.removeFrom(entry.getPostcode()));
             unit.pqi = entry.getPositionalQualityIndicator();
 

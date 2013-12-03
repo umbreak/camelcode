@@ -45,7 +45,7 @@ public abstract class Model {
         return id != null ? id.hashCode() : 0;
     }
 
-    public Key key() {
+    public Key<Model> key() {
         return datastore.getKey(this);
     }
 

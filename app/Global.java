@@ -1,25 +1,8 @@
-import actors.ProcessCPOCsvEntry;
-import akka.actor.ActorRef;
-import akka.actor.Props;
-import akka.actor.UntypedActor;
-import akka.actor.UntypedActorFactory;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.mongodb.morphia.logging.MorphiaLoggerFactory;
 import org.mongodb.morphia.logging.slf4j.SLF4JLogrImplFactory;
-import com.google.common.base.Function;
-import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
-import com.google.common.util.concurrent.AbstractExecutionThreadService;
-import com.google.common.util.concurrent.AbstractIdleService;
-import com.google.common.util.concurrent.AbstractService;
-import com.google.common.util.concurrent.Service;
-import com.google.inject.*;
-import com.google.inject.multibindings.Multibinder;
-import com.google.inject.name.Names;
-import com.google.inject.spi.InjectionListener;
-import com.google.inject.spi.TypeEncounter;
-import com.google.inject.spi.TypeListener;
-import com.yammer.metrics.reporting.ConsoleReporter;
 import org.reflections.Reflections;
 import org.reflections.scanners.SubTypesScanner;
 import org.reflections.util.ClasspathHelper;
@@ -28,16 +11,31 @@ import org.reflections.util.FilterBuilder;
 import play.Application;
 import play.GlobalSettings;
 import play.Logger;
-import play.Play;
 import play.libs.Akka;
 import play.mvc.Controller;
 import utils.MoreMatchers;
-
-import java.lang.reflect.Modifier;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.TimeUnit;
+import actors.ProcessCPOCsvEntry;
+import akka.actor.ActorRef;
+import akka.actor.Props;
+import com.google.common.base.Function;
+import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
+import com.google.common.util.concurrent.AbstractExecutionThreadService;
+import com.google.common.util.concurrent.AbstractIdleService;
+import com.google.common.util.concurrent.AbstractService;
+import com.google.common.util.concurrent.Service;
+import com.google.inject.AbstractModule;
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+import com.google.inject.Module;
+import com.google.inject.Stage;
+import com.google.inject.TypeLiteral;
+import com.google.inject.multibindings.Multibinder;
+import com.google.inject.name.Names;
+import com.google.inject.spi.InjectionListener;
+import com.google.inject.spi.TypeEncounter;
+import com.google.inject.spi.TypeListener;
 
 /**
  * @author Mathias Bogaert
@@ -48,25 +46,25 @@ public class Global extends GlobalSettings {
         MorphiaLoggerFactory.registerLogger(SLF4JLogrImplFactory.class);
     }
 
-    static final class ActorProvider<T extends UntypedActor> implements Provider<ActorRef> {
-        private final TypeLiteral<T> uta;
-        private final Injector injector;
-
-        @Inject
-        public ActorProvider(TypeLiteral<T> uta, Injector injector) {
-            this.uta = uta;
-            this.injector = injector;
-        }
-
-        @Override
-        public ActorRef get() {
-            return Akka.system().actorOf(new Props(new UntypedActorFactory() {
-                public T create() {
-                    return injector.getInstance(Key.get(uta));
-                }
-            }));
-        }
-    }
+//    static final class ActorProvider<T extends UntypedActor> implements Provider<ActorRef> {
+//        private final TypeLiteral<T> uta;
+//        private final Injector injector;
+//
+//        @Inject
+//        public ActorProvider(TypeLiteral<T> uta, Injector injector) {
+//            this.uta = uta;
+//            this.injector = injector;
+//        }
+//
+//        @Override
+//        public ActorRef get() {
+//            return Akka.system().actorOf(new Props(new UntypedActorFactory() {
+//                public T create() {
+//                    return injector.getInstance(Key.get(uta));
+//                }
+//            }));
+//        }
+//    }
 
     private Injector injector;
     private final List<Module> modules = Lists.newArrayList();
@@ -131,9 +129,7 @@ public class Global extends GlobalSettings {
                 }
 
                 // bind actor - todo use reflections for this
-                bind(ActorRef.class).annotatedWith(Names.named("ProcessCPOCsvEntry"))
-                        .toProvider(new TypeLiteral<ActorProvider<ProcessCPOCsvEntry>>() {
-                        });
+                bind(ActorRef.class).annotatedWith(Names.named("ProcessCPOCsvEntry")).toInstance(Akka.system().actorOf(Props.create(ProcessCPOCsvEntry.class)));
 
                 // start/stop services after injection and on shutdown of the Play app
                 bindListener(MoreMatchers.subclassesOf(Service.class), new TypeListener() {
@@ -146,13 +142,13 @@ public class Global extends GlobalSettings {
                                     @Override
                                     public void onApplicationStart(Application application, Injector injector) {
                                         Logger.info(String.format("Starting %s", i.toString()));
-                                        ((Service) i).start();
+                                        ((Service) i).startAsync();
 
                                         onStopListeners.add(new OnStopListener() {
                                             @Override
                                             public void onApplicationStop(Application application) {
                                                 Logger.info(String.format("Stopping %s", i.toString()));
-                                                ((Service) i).stop();
+                                                ((Service) i).stopAsync();
                                             }
                                         });
                                     }
@@ -186,6 +182,7 @@ public class Global extends GlobalSettings {
             listener.onApplicationStop(app);
         }
     }
+
 
     /**
      * Listener that will get invoked after the application is started.
